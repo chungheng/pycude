@@ -199,25 +199,21 @@ class DifferentialEvolutionSolver(object):
         status_message = _status_message['success']
 
         # calculate energies to start with
+        parameters_lst = []
         for index, candidate in enumerate(self.population):
-            parameters = self._scale_parameters(candidate)
-            self.population_energies[index] = self.func(parameters,
-                                                        *self.args)
-            nfev += 1
+            parameters_lst.append(self._scale_parameters(candidate))
 
-            if nfev > self.maxfun:
-                warning_flag = True
-                status_message = _status_message['maxfev']
-                break
+        self.population_energies = self.evaluate_func(parameters_lst)
+        nfev += self.num_population_members
 
-        minval = np.argmin(self.population_energies)
+        if nfev > self.maxfun:
+            warning_flag = True
+            status_message = _status_message['maxfev']
+            break
 
         # put the lowest energy into the best solution position.
-        lowest_energy = self.population_energies[minval]
-        self.population_energies[minval] = self.population_energies[0]
-        self.population_energies[0] = lowest_energy
-
-        self.population[[0, minval], :] = self.population[[minval, 0], :]
+        minval = np.argmin(self.population_energies)
+        self._swap_best(minval)
 
         if warning_flag:
             return OptimizeResult(
@@ -234,6 +230,10 @@ class DifferentialEvolutionSolver(object):
                 self.scale = self.random_number_generator.rand(
                 ) * (self.dither[1] - self.dither[0]) + self.dither[0]
 
+            # Unlike the standard DE, all the trials are created first and later
+            # evaluated simultaneously.
+            trial_lst = []
+            parameters_lst = []
             for candidate in range(self.num_population_members):
                 if nfev > self.maxfun:
                     warning_flag = True
@@ -249,21 +249,24 @@ class DifferentialEvolutionSolver(object):
                 # scale from [0, 1) to the actual parameter value
                 parameters = self._scale_parameters(trial)
 
-                # determine the energy of the objective function
-                energy = self.func(parameters, *self.args)
-                nfev += 1
+                trial_lst.append(trial)
+                parameters_lst.append(parameters)
 
-                # if the energy of the trial candidate is lower than the
-                # original population member then replace it
-                if energy < self.population_energies[candidate]:
-                    self.population[candidate] = trial
-                    self.population_energies[candidate] = energy
+            # determine the energy of the objective function
+            energies = self.evaluate_func(parameters_lst)
+            nfev += self.num_population_members
 
-                    # if the trial candidate also has a lower energy than the
-                    # best solution then replace that as well
-                    if energy < self.population_energies[0]:
-                        self.population_energies[0] = energy
-                        self.population[0] = trial
+            # if the energy of the trial candidate is lower than the
+            # original population member then replace it
+            for candidate in range(self.num_population_members):
+                if energies[candidate] < self.population_energies[candidate]:
+                    self.population[candidate] = trial_lst[candidate]
+                    self.population_energies[candidate] = energies[candidate]
+
+            # if the trial candidate also has a lower energy than the
+            # best solution then replace that as well
+            minval = np.argmin(self.population_energies)
+            self._swap_best(minval)
 
             # stop when the fractional s.d. of the population is less than tol
             # of the mean energy
@@ -438,6 +441,13 @@ class DifferentialEvolutionSolver(object):
         self.random_number_generator.shuffle(idxs)
         idxs = idxs[:number_samples]
         return idxs
+
+    def _swap_best(self, i):
+        """
+        put the i-th solution into the best solution position.
+        """
+        self.population_energies[[0, i]] = self.population_energies[[i, 0]]
+        self.population[[0, i], :] = self.population[[i, 0], :]
 
 
 def _make_random_gen(seed):
