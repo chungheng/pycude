@@ -9,6 +9,8 @@ from scipy.optimize import OptimizeResult
 from scipy.optimize.optimize import _status_message
 import numbers
 
+import pycuda.gpuarray as garray
+
 __all__ = ['differential_evolution']
 
 _MACHEPS = np.finfo(np.float64).eps
@@ -168,6 +170,14 @@ class DifferentialEvolutionSolver(object):
         """
         rng = self.random_number_generator
         self.population = rng.random_sample(self.population_shape)
+
+    def init_pycuda_array(self):
+        dtype = self.population.dtype
+        self.gpu_arrays = []
+
+        for i in range(self.parameter_count):
+            array = garray.zeros(self.num_population_members, dtype=dtype)
+            self.gpu_arrays.append(array)
 
     @property
     def x(self):
