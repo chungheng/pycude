@@ -190,6 +190,9 @@ class DifferentialEvolutionSolver(object):
         """
         return self._scale_parameters(self.population[0])
 
+    def evaluate_func(self, parameters):
+        self.func(self.gpu_arrays, *self.args)
+
     def solve(self):
         """
         Runs the DifferentialEvolutionSolver.
