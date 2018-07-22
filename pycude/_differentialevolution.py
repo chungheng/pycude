@@ -10,6 +10,7 @@ from scipy.optimize.optimize import _status_message
 import numbers
 
 import pycuda.gpuarray as garray
+import pycuda.driver as gdrv
 
 __all__ = ['differential_evolution']
 
@@ -191,6 +192,9 @@ class DifferentialEvolutionSolver(object):
         return self._scale_parameters(self.population[0])
 
     def evaluate_func(self, parameters):
+        for index, (dest, src) in enumerate(self.gpu_arrays, parameters.T):
+            gdrv.memcpy_htod(dest, src)
+
         self.func(self.gpu_arrays, *self.args)
 
     def solve(self):
