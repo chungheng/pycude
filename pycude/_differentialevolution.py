@@ -212,11 +212,11 @@ class DifferentialEvolutionSolver(object):
         status_message = _status_message['success']
 
         # calculate energies to start with
-        parameters_lst = []
+        parameters = np.zeros_like(population)
         for index, candidate in enumerate(self.population):
-            parameters_lst.append(self._scale_parameters(candidate))
+            parameters[index, :] = self._scale_parameters(candidate)
 
-        self.population_energies = self.evaluate_func(parameters_lst)
+        self.population_energies = self.evaluate_func(parameters)
         nfev += self.num_population_members
 
         if nfev > self.maxfun:
@@ -238,6 +238,7 @@ class DifferentialEvolutionSolver(object):
                            success=(warning_flag is not True))
 
         # do the optimisation.
+        trials = np.zeros_like(self.population)
         for nit in range(1, self.maxiter + 1):
             if self.dither is not None:
                 self.scale = self.random_number_generator.rand(
@@ -245,8 +246,6 @@ class DifferentialEvolutionSolver(object):
 
             # Unlike the standard DE, all the trials are created first and later
             # evaluated simultaneously.
-            trial_lst = []
-            parameters_lst = []
             for candidate in range(self.num_population_members):
                 if nfev > self.maxfun:
                     warning_flag = True
@@ -254,19 +253,16 @@ class DifferentialEvolutionSolver(object):
                     break
 
                 # create a trial solution
-                trial = self._mutate(candidate)
+                trials[candidate][:] = self._mutate(candidate)
 
                 # ensuring that it's in the range [0, 1)
-                self._ensure_constraint(trial)
+                self._ensure_constraint(trials[candidate])
 
                 # scale from [0, 1) to the actual parameter value
-                parameters = self._scale_parameters(trial)
-
-                trial_lst.append(trial)
-                parameters_lst.append(parameters)
+                parameters[index][:] = self._scale_parameters(trials[candidate])
 
             # determine the energy of the objective function
-            energies = self.evaluate_func(parameters_lst)
+            energies = self.evaluate_func(parameters)
             nfev += self.num_population_members
 
             # if the energy of the trial candidate is lower than the
