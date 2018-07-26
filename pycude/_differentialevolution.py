@@ -280,8 +280,8 @@ class DifferentialEvolutionSolver(object):
         return self._scale_parameters(self.population[0])
 
     def evaluate_func(self, parameters):
-        for index, (dest, src) in enumerate(self.gpu_arrays, parameters.T):
-            gdrv.memcpy_htod(dest, src)
+        for index, (dest, src) in enumerate(zip(self.gpu_arrays, parameters.T)):
+            gdrv.memcpy_htod(dest.gpudata, src)
 
         self.func(self.gpu_arrays, *self.args)
 
