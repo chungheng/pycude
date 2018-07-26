@@ -111,7 +111,16 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
             - 'latinhypercube'
             - 'random'
     """
-    pass
+    solver = DifferentialEvolutionSolver(func, bounds, args=args,
+                                         strategy=strategy, maxiter=maxiter,
+                                         popsize=popsize, tol=tol,
+                                         mutation=mutation,
+                                         recombination=recombination,
+                                         seed=seed, polish=polish,
+                                         callback=callback,
+                                         disp=disp,
+                                         init=init)
+    return solver.solve()
 
 class DifferentialEvolutionSolver(object):
 
