@@ -219,6 +219,8 @@ class DifferentialEvolutionSolver(object):
 
         self.disp = disp
 
+        self.init_pycuda_arrays()
+
     def init_population_lhs(self):
         """
         Initializes the population with Latin Hypercube Sampling.
@@ -258,7 +260,7 @@ class DifferentialEvolutionSolver(object):
         rng = self.random_number_generator
         self.population = rng.random_sample(self.population_shape)
 
-    def init_pycuda_array(self):
+    def init_pycuda_arrays(self):
         dtype = self.population.dtype
         self.gpu_arrays = []
 
@@ -302,7 +304,7 @@ class DifferentialEvolutionSolver(object):
         status_message = _status_message['success']
 
         # calculate energies to start with
-        parameters = np.zeros_like(population)
+        parameters = np.zeros_like(self.population)
         for index, candidate in enumerate(self.population):
             parameters[index, :] = self._scale_parameters(candidate)
 
@@ -312,7 +314,6 @@ class DifferentialEvolutionSolver(object):
         if nfev > self.maxfun:
             warning_flag = True
             status_message = _status_message['maxfev']
-            break
 
         # put the lowest energy into the best solution position.
         minval = np.argmin(self.population_energies)
