@@ -329,7 +329,7 @@ class DifferentialEvolutionSolver(object):
                            success=(warning_flag is not True))
 
         # do the optimisation.
-        trials = np.zeros_like(self.population)
+        trials = np.zeros_like(self.population, order='F')
         for nit in range(1, self.maxiter + 1):
             if self.dither is not None:
                 self.scale = self.random_number_generator.rand(
