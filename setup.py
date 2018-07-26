@@ -63,7 +63,7 @@ if __name__ == "__main__":
         maintainer_email = MAINTAINER_EMAIL,
         packages=PACKAGES,
         install_requires=[
-            'scipy' >= 1.1.0,
-            'pycuda' >= 2018.1
+            'scipy >= 1.1.0',
+            'pycuda >= 2018.1'
         ]
     )
