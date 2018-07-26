@@ -283,7 +283,7 @@ class DifferentialEvolutionSolver(object):
         for index, (dest, src) in enumerate(zip(self.gpu_arrays, parameters.T)):
             gdrv.memcpy_htod(dest.gpudata, src)
 
-        self.func(self.gpu_arrays, *self.args)
+        return self.func(self.gpu_arrays, *self.args)
 
     def solve(self):
         """
@@ -308,7 +308,7 @@ class DifferentialEvolutionSolver(object):
         for index, candidate in enumerate(self.population):
             parameters[index, :] = self._scale_parameters(candidate)
 
-        self.population_energies = self.evaluate_func(parameters)
+        self.population_energies[:] = self.evaluate_func(parameters)
         nfev += self.num_population_members
 
         if nfev > self.maxfun:
