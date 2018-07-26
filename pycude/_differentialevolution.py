@@ -19,7 +19,7 @@ _MACHEPS = np.finfo(np.float64).eps
 def differential_evolution(func, bounds, args=(), strategy='best1bin',
                            maxiter=None, popsize=15, tol=0.01,
                            mutation=(0.5, 1), recombination=0.7, seed=None,
-                           callback=None, disp=False, polish=True,
+                           callback=None, disp=False, polish=False,
                            init='latinhypercube'):
     """Finds the global minimum of a multivariate function.
 
@@ -139,7 +139,7 @@ class DifferentialEvolutionSolver(object):
     def __init__(self, func, bounds, args=(),
                  strategy='best1bin', maxiter=None, popsize=15,
                  tol=0.01, mutation=(0.5, 1), recombination=0.7, seed=None,
-                 maxfun=None, callback=None, disp=False, polish=True,
+                 maxfun=None, callback=None, disp=False, polish=False,
                  init='latinhypercube'):
 
         if strategy in self._binomial:
