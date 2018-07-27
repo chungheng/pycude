@@ -360,7 +360,7 @@ class DifferentialEvolutionSolver(object):
             # original population member then replace it
             for candidate in range(self.num_population_members):
                 if energies[candidate] < self.population_energies[candidate]:
-                    self.population[candidate] = trial_lst[candidate]
+                    self.population[candidate] = trials[candidate]
                     self.population_energies[candidate] = energies[candidate]
 
             # if the trial candidate also has a lower energy than the
