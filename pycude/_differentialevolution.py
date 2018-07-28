@@ -304,7 +304,7 @@ class DifferentialEvolutionSolver(object):
         status_message = _status_message['success']
 
         # calculate energies to start with
-        parameters = np.zeros_like(self.population)
+        parameters = np.zeros_like(self.population, order='F')
         for index, candidate in enumerate(self.population):
             parameters[index, :] = self._scale_parameters(candidate)
 
@@ -337,20 +337,20 @@ class DifferentialEvolutionSolver(object):
 
             # Unlike the standard DE, all the trials are created first and later
             # evaluated simultaneously.
-            for candidate in range(self.num_population_members):
+            for index in range(self.num_population_members):
                 if nfev > self.maxfun:
                     warning_flag = True
                     status_message = _status_message['maxfev']
                     break
 
                 # create a trial solution
-                trials[candidate][:] = self._mutate(candidate)
+                trials[index][:] = self._mutate(index)
 
                 # ensuring that it's in the range [0, 1)
-                self._ensure_constraint(trials[candidate])
+                self._ensure_constraint(trials[index])
 
                 # scale from [0, 1) to the actual parameter value
-                parameters[index][:] = self._scale_parameters(trials[candidate])
+                parameters[index][:] = self._scale_parameters(trials[index])
 
             # determine the energy of the objective function
             energies = self.evaluate_func(parameters)
@@ -358,10 +358,10 @@ class DifferentialEvolutionSolver(object):
 
             # if the energy of the trial candidate is lower than the
             # original population member then replace it
-            for candidate in range(self.num_population_members):
-                if energies[candidate] < self.population_energies[candidate]:
-                    self.population[candidate] = trials[candidate]
-                    self.population_energies[candidate] = energies[candidate]
+            for index in range(self.num_population_members):
+                if energies[index] < self.population_energies[index]:
+                    self.population[index] = trials[index]
+                    self.population_energies[index] = energies[index]
 
             # if the trial candidate also has a lower energy than the
             # best solution then replace that as well
