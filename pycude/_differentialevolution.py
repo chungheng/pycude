@@ -102,9 +102,6 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
         If True, then `scipy.optimize.minimize` with the `L-BFGS-B` method
         is used to polish the best population member at the end. This requires
         a few more function evaluations.
-    maxfun : int, optional
-        Set the maximum number of function evaluations. However, it probably
-        makes more sense to set `maxiter` instead.
     init : string, optional
         Specify which type of population initialization is performed. Should be
         one of:
@@ -139,7 +136,7 @@ class DifferentialEvolutionSolver(object):
     def __init__(self, func, bounds, args=(),
                  strategy='best1bin', maxiter=None, popsize=15,
                  tol=0.01, mutation=(0.5, 1), recombination=0.7, seed=None,
-                 maxfun=None, callback=None, disp=False, polish=False,
+                 callback=None, disp=False, polish=False,
                  init='latinhypercube'):
 
         if strategy in self._binomial:
@@ -185,8 +182,6 @@ class DifferentialEvolutionSolver(object):
                              ' in x')
 
         self.maxiter = maxiter or 1000
-        self.maxfun = (maxfun or ((self.maxiter + 1) * popsize *
-                                  np.size(self.limits, 1)))
 
         # population is scaled to between [0, 1].
         # We have to scale between parameter <-> population
@@ -311,10 +306,6 @@ class DifferentialEvolutionSolver(object):
         self.population_energies[:] = self.evaluate_func(parameters)
         nfev += self.num_population_members
 
-        if nfev > self.maxfun:
-            warning_flag = True
-            status_message = _status_message['maxfev']
-
         # put the lowest energy into the best solution position.
         minval = np.argmin(self.population_energies)
         self._swap_best(minval)
@@ -338,11 +329,6 @@ class DifferentialEvolutionSolver(object):
             # Unlike the standard DE, all the trials are created first and later
             # evaluated simultaneously.
             for index in range(self.num_population_members):
-                if nfev > self.maxfun:
-                    warning_flag = True
-                    status_message = _status_message['maxfev']
-                    break
-
                 # create a trial solution
                 trials[index][:] = self._mutate(index)
 
