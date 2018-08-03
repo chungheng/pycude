@@ -16,7 +16,7 @@ __all__ = ['differential_evolution']
 
 _MACHEPS = np.finfo(np.float64).eps
 
-def differential_evolution(func, bounds, args=(), strategy='best1bin',
+def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
                            maxiter=None, popsize=15, tol=0.01,
                            mutation=(0.5, 1), recombination=0.7, seed=None,
                            callbacks=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
@@ -32,11 +32,14 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
         the function. The objective function must be in the form ``f(x, *arg)``,
         where ``x`` is the argument taken from the i-th element from each
         arrays in ``X``, i.e. ``x = (X[0][i], ..., X[N][i])``.
-        bounds : sequence
+    bounds : sequence
         Bounds for variables.  ``(min, max)`` pairs for each element in ``x``,
         defining the lower and upper bounds for the optimizing argument of
         `func`. It is required to have ``len(bounds) == len(x)``.
         ``len(bounds)`` is used to determine the number of parameters in ``x``.
+    x0 : tuple, optional
+        Initial value for ``x``. If ``x0`` is given, it will be placed at the
+        first element of the population.
     args : tuple, optional
         Any additional fixed parameters needed to
         completely specify the objective function.
@@ -110,7 +113,7 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
             - 'latinhypercube'
             - 'random'
     """
-    solver = DifferentialEvolutionSolver(func, bounds, args=args,
+    solver = DifferentialEvolutionSolver(func, bounds, args=args, x0=None,
                                          strategy=strategy, maxiter=maxiter,
                                          popsize=popsize, tol=tol,
                                          mutation=mutation,
@@ -136,7 +139,7 @@ class DifferentialEvolutionSolver(object):
                     'best2exp': '_best2',
                     'rand2exp': '_rand2'}
 
-    def __init__(self, func, bounds, args=(),
+    def __init__(self, func, bounds, args=(), x0=None,
                  strategy='best1bin', maxiter=None, popsize=15,
                  tol=0.01, mutation=(0.5, 1), recombination=0.7, seed=None,
                  callbacks=None, earlystop=None, disp=False, polish=False,
@@ -151,7 +154,7 @@ class DifferentialEvolutionSolver(object):
         self.strategy = strategy
 
         if callbacks is not None and callable(callbacks):
-            self.callbacks = (callbacks)
+            self.callbacks = (callbacks,)
         else:
             self.callbacks = callbacks
         self.earlystop = earlystop
@@ -222,6 +225,11 @@ class DifferentialEvolutionSolver(object):
         self.disp = disp
 
         self.init_pycuda_arrays()
+
+        if x0 is not None:
+            p0 = self._unscale_parameters(x0)
+            self.population[0][:] = x0
+
 
     def init_population_lhs(self):
         """
