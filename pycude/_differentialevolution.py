@@ -19,7 +19,7 @@ _MACHEPS = np.finfo(np.float64).eps
 def differential_evolution(func, bounds, args=(), strategy='best1bin',
                            maxiter=None, popsize=15, tol=0.01,
                            mutation=(0.5, 1), recombination=0.7, seed=None,
-                           callbakcs=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
+                           callbacks=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
     """Finds the global minimum of a multivariate function.
 
     Parameters
