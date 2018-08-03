@@ -19,8 +19,7 @@ _MACHEPS = np.finfo(np.float64).eps
 def differential_evolution(func, bounds, args=(), strategy='best1bin',
                            maxiter=None, popsize=15, tol=0.01,
                            mutation=(0.5, 1), recombination=0.7, seed=None,
-                           earlystop=None, disp=False, polish=False,
-                           init='latinhypercube'):
+                           callbakcs=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
     """Finds the global minimum of a multivariate function.
 
     Parameters
@@ -98,6 +97,9 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
         value of the population convergence.  When ``val`` is greater than one
         the function halts. If `earlystop` returns `True`, then the minimization
         is halted (any polishing is still carried out).
+    callbacks : list of callables, `callback(population, energies)`, optional
+        A list of functions to be called at the end of each iteration. This
+        is similar to Keras' callbacks.
     polish : bool, optional
         If True, then `scipy.optimize.minimize` with the `L-BFGS-B` method
         is used to polish the best population member at the end. This requires
@@ -115,6 +117,7 @@ def differential_evolution(func, bounds, args=(), strategy='best1bin',
                                          recombination=recombination,
                                          seed=seed, polish=polish,
                                          earlystop=earlystop,
+                                         callbacks=callbacks,
                                          disp=disp,
                                          init=init)
     return solver.solve()
@@ -136,7 +139,7 @@ class DifferentialEvolutionSolver(object):
     def __init__(self, func, bounds, args=(),
                  strategy='best1bin', maxiter=None, popsize=15,
                  tol=0.01, mutation=(0.5, 1), recombination=0.7, seed=None,
-                 earlystop=None, disp=False, polish=False,
+                 callbacks=None, earlystop=None, disp=False, polish=False,
                  init='latinhypercube'):
 
         if strategy in self._binomial:
@@ -147,6 +150,10 @@ class DifferentialEvolutionSolver(object):
             raise ValueError("Please select a valid mutation strategy")
         self.strategy = strategy
 
+        if callbacks is not None and callable(callbacks):
+            self.callbacks = (callbacks)
+        else:
+            self.callbacks = callbacks
         self.earlystop = earlystop
         self.polish = polish
         self.tol = tol
@@ -365,8 +372,12 @@ class DifferentialEvolutionSolver(object):
                       % (nit,
                          self.population_energies[0]))
 
+            if self.callbacks:
+                for callback in self.callbacks:
+                    callback(self.x, self.population_energies[0])
+
             if (self.earlystop and
-                    self.earlystop(self._scale_parameters(self.population[0]),
+                    self.earlystop(self.x,
                                   convergence=self.tol / convergence) is True):
 
                 warning_flag = True
