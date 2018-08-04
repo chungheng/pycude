@@ -100,9 +100,13 @@ def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
         value of the population convergence.  When ``val`` is greater than one
         the function halts. If `earlystop` returns `True`, then the minimization
         is halted (any polishing is still carried out).
-    callbacks : list of callables, `callback(population, energies)`, optional
-        A list of functions to be called at the end of each iteration. This
-        is similar to Keras' callbacks.
+    callbacks : a callable or a list of callables, optional
+        A list of functions to be called at the end of each iteration. A
+        callback will be called with `callback(step=i, parameter=p, cost=c)`,
+        where ``step`` is the step of iteration, ``parameter`` is the best
+        solution with the lowest ``cost``. Note adding keyword arguments to the
+        signature of a callback will avoid 'unexpected argument' error, i.e
+        ``callback(..., **kwargs)``.
     polish : bool, optional
         If True, then `scipy.optimize.minimize` with the `L-BFGS-B` method
         is used to polish the best population member at the end. This requires
@@ -382,7 +386,8 @@ class DifferentialEvolutionSolver(object):
 
             if self.callbacks:
                 for callback in self.callbacks:
-                    callback(self.x, self.population_energies[0])
+                    callback(step=nit, parameter=self.x,
+                             cost=self.population_energies[0])
 
             if (self.earlystop and
                     self.earlystop(self.x,
