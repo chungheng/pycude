@@ -16,9 +16,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../'))
 
 
 # -- General configuration ------------------------------------------------
@@ -48,7 +48,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'PyCuDe'
+project = u'PyCUDE'
 copyright = u'2019, Chung-Heng Yeh'
 author = u'Chung-Heng Yeh'
 
@@ -81,11 +81,24 @@ todo_include_todos = False
 
 
 # -- Options for HTML output ----------------------------------------------
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if on_rtd:
+    html_theme = 'default'
+else:
+
+    import sphinx_rtd_theme
+
+    # The theme to use for HTML and HTML Help pages.  Major themes that come with
+    # Sphinx are currently 'default' and 'sphinxdoc'.
+    html_theme = 'sphinx_rtd_theme'
+
+    # Add any paths that contain custom themes here, relative to this directory.
+    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+# html_theme = []
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -114,7 +127,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'PyCuDedoc'
+htmlhelp_basename = 'PyCUDEdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -141,7 +154,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'PyCuDe.tex', u'PyCuDe Documentation',
+    (master_doc, 'PyCUDE.tex', u'PyCUDE Documentation',
      u'Chung-Heng Yeh', 'manual'),
 ]
 
@@ -151,7 +164,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'pycude', u'PyCuDe Documentation',
+    (master_doc, 'pycude', u'PyCUDE Documentation',
      [author], 1)
 ]
 
@@ -162,10 +175,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'PyCuDe', u'PyCuDe Documentation',
-     author, 'PyCuDe', 'One line description of project.',
+    (master_doc, 'PyCuDe', u'PyCUDE Documentation',
+     author, 'PyCUDE', 'One line description of project.',
      'Miscellaneous'),
 ]
-
-
-
