@@ -9,8 +9,11 @@ from scipy.optimize import OptimizeResult
 from scipy.optimize.optimize import _status_message
 import numbers
 
-import pycuda.gpuarray as garray
-import pycuda.driver as gdrv
+try:
+    import pycuda.gpuarray as garray
+    import pycuda.driver as gdrv
+except:
+    pass
 
 __all__ = ['differential_evolution']
 
@@ -21,6 +24,7 @@ def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
                            mutation=(0.5, 1), recombination=0.7, seed=None,
                            callbacks=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
     """Finds the global minimum of a multivariate function.
+    This implementation is largely based on Scipy's implementation of DE.
 
     Parameters
     ----------
