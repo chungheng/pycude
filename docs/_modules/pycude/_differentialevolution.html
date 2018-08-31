@@ -1,0 +1,772 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pycude._differentialevolution &mdash; PyCUDE 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> PyCUDE
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../license.html">License</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PyCUDE</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>pycude._differentialevolution</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for pycude._differentialevolution</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">differential_evolution: The differential evolution global optimization algorithm</span>
+
+<span class="sd">This file is largely (shamelessly) based on the Scipy&#39;s implementation of DE.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span><span class="p">,</span> <span class="n">print_function</span><span class="p">,</span> <span class="n">absolute_import</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="k">import</span> <span class="n">OptimizeResult</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize.optimize</span> <span class="k">import</span> <span class="n">_status_message</span>
+<span class="kn">import</span> <span class="nn">numbers</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">pycuda.gpuarray</span> <span class="k">as</span> <span class="nn">garray</span>
+    <span class="kn">import</span> <span class="nn">pycuda.driver</span> <span class="k">as</span> <span class="nn">gdrv</span>
+<span class="k">except</span><span class="p">:</span>
+    <span class="k">pass</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;differential_evolution&#39;</span><span class="p">]</span>
+
+<span class="n">_MACHEPS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span>
+
+<div class="viewcode-block" id="differential_evolution"><a class="viewcode-back" href="../../reference.html#pycude._differentialevolution.differential_evolution">[docs]</a><span class="k">def</span> <span class="nf">differential_evolution</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">bounds</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(),</span> <span class="n">strategy</span><span class="o">=</span><span class="s1">&#39;best1bin&#39;</span><span class="p">,</span>
+                           <span class="n">maxiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">popsize</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+                           <span class="n">mutation</span><span class="o">=</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">recombination</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">earlystop</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">polish</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="s1">&#39;latinhypercube&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Finds the global minimum of a multivariate function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    func : callable</span>
+<span class="sd">        The wrapper for parallel invocation of the objective function to be</span>
+<span class="sd">        minimized.  Must be in the form ``F(X, *args)``, where ``X`` is the</span>
+<span class="sd">        argument in the form of a tuple of PyCUDA arrays and ``args`` is a</span>
+<span class="sd">        tuple of any additional fixed parameters needed to completely specify</span>
+<span class="sd">        the function. The objective function must be in the form ``f(x, *arg)``,</span>
+<span class="sd">        where ``x`` is the argument taken from the i-th element from each</span>
+<span class="sd">        arrays in ``X``, i.e. ``x = (X[0][i], ..., X[N][i])``.</span>
+<span class="sd">    bounds : sequence</span>
+<span class="sd">        Bounds for variables.  ``(min, max)`` pairs for each element in ``x``,</span>
+<span class="sd">        defining the lower and upper bounds for the optimizing argument of</span>
+<span class="sd">        `func`. It is required to have ``len(bounds) == len(x)``.</span>
+<span class="sd">        ``len(bounds)`` is used to determine the number of parameters in ``x``.</span>
+<span class="sd">    x0 : tuple, optional</span>
+<span class="sd">        Initial value for ``x``. If ``x0`` is given, it will be placed at the</span>
+<span class="sd">        first element of the population.</span>
+<span class="sd">    args : tuple, optional</span>
+<span class="sd">        Any additional fixed parameters needed to</span>
+<span class="sd">        completely specify the objective function.</span>
+<span class="sd">    strategy : str, optional</span>
+<span class="sd">        The differential evolution strategy to use. Should be one of:</span>
+<span class="sd">            - &#39;best1bin&#39;</span>
+<span class="sd">            - &#39;best1exp&#39;</span>
+<span class="sd">            - &#39;rand1exp&#39;</span>
+<span class="sd">            - &#39;randtobest1exp&#39;</span>
+<span class="sd">            - &#39;best2exp&#39;</span>
+<span class="sd">            - &#39;rand2exp&#39;</span>
+<span class="sd">            - &#39;randtobest1bin&#39;</span>
+<span class="sd">            - &#39;best2bin&#39;</span>
+<span class="sd">            - &#39;rand2bin&#39;</span>
+<span class="sd">            - &#39;rand1bin&#39;</span>
+<span class="sd">        The default is &#39;best1bin&#39;</span>
+<span class="sd">    maxiter : int, optional</span>
+<span class="sd">        The maximum number of generations over which the entire population is</span>
+<span class="sd">        evolved. The maximum number of function evaluations (with no polishing)</span>
+<span class="sd">        is: ``(maxiter + 1) * popsize * len(x)``</span>
+<span class="sd">    popsize : int, optional</span>
+<span class="sd">        A multiplier for setting the total population size.  The population has</span>
+<span class="sd">        ``popsize * len(x)`` individuals.</span>
+<span class="sd">    tol : float, optional</span>
+<span class="sd">        When the mean of the population energies, multiplied by tol,</span>
+<span class="sd">        divided by the standard deviation of the population energies</span>
+<span class="sd">        is greater than 1 the solving process terminates:</span>
+<span class="sd">        ``convergence = mean(pop) * tol / stdev(pop) &gt; 1``</span>
+<span class="sd">    mutation : float or tuple(float, float), optional</span>
+<span class="sd">        The mutation constant. In the literature this is also known as</span>
+<span class="sd">        differential weight, being denoted by F.</span>
+<span class="sd">        If specified as a float it should be in the range [0, 2].</span>
+<span class="sd">        If specified as a tuple ``(min, max)`` dithering is employed. Dithering</span>
+<span class="sd">        randomly changes the mutation constant on a generation by generation</span>
+<span class="sd">        basis. The mutation constant for that generation is taken from</span>
+<span class="sd">        U[min, max). Dithering can help speed convergence significantly.</span>
+<span class="sd">        Increasing the mutation constant increases the search radius, but will</span>
+<span class="sd">        slow down convergence.</span>
+<span class="sd">    recombination : float, optional</span>
+<span class="sd">        The recombination constant, should be in the range [0, 1]. In the</span>
+<span class="sd">        literature this is also known as the crossover probability, being</span>
+<span class="sd">        denoted by CR. Increasing this value allows a larger number of mutants</span>
+<span class="sd">        to progress into the next generation, but at the risk of population</span>
+<span class="sd">        stability.</span>
+<span class="sd">    seed : int or `np.random.RandomState`, optional</span>
+<span class="sd">        If `seed` is not specified the `np.random.RandomState` singleton is</span>
+<span class="sd">        used.</span>
+<span class="sd">        If `seed` is an int, a new `np.random.RandomState` instance is used,</span>
+<span class="sd">        seeded with `seed`.</span>
+<span class="sd">        If `seed` is already a `np.random.RandomState` instance, then that</span>
+<span class="sd">        `np.random.RandomState` instance is used.</span>
+<span class="sd">        Specify `seed` for repeatable minimizations.</span>
+<span class="sd">    disp : bool, optional</span>
+<span class="sd">        Display status messages</span>
+<span class="sd">    earlystop : callable, `earlystop(xk, convergence=val)`, optional</span>
+<span class="sd">        A function to follow the progress of the minimization. ``xk`` is</span>
+<span class="sd">        the current value of ``x0``. ``val`` represents the fractional</span>
+<span class="sd">        value of the population convergence.  When ``val`` is greater than one</span>
+<span class="sd">        the function halts. If `earlystop` returns `True`, then the minimization</span>
+<span class="sd">        is halted (any polishing is still carried out).</span>
+<span class="sd">    callbacks : a callable or a list of callables, optional</span>
+<span class="sd">        A list of functions to be called at the end of each iteration. A</span>
+<span class="sd">        callback will be called with `callback(step=i, parameter=p, cost=c)`,</span>
+<span class="sd">        where ``step`` is the step of iteration, ``parameter`` is the best</span>
+<span class="sd">        solution with the lowest ``cost``. Note adding keyword arguments to the</span>
+<span class="sd">        signature of a callback will avoid &#39;unexpected argument&#39; error, i.e</span>
+<span class="sd">        ``callback(..., **kwargs)``.</span>
+<span class="sd">    polish : bool, optional</span>
+<span class="sd">        If True, then `scipy.optimize.minimize` with the `L-BFGS-B` method</span>
+<span class="sd">        is used to polish the best population member at the end. This requires</span>
+<span class="sd">        a few more function evaluations.</span>
+<span class="sd">    init : string, optional</span>
+<span class="sd">        Specify which type of population initialization is performed. Should be</span>
+<span class="sd">        one of:</span>
+<span class="sd">            - &#39;latinhypercube&#39;</span>
+<span class="sd">            - &#39;random&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">DifferentialEvolutionSolver</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">bounds</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                         <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="n">maxiter</span><span class="p">,</span>
+                                         <span class="n">popsize</span><span class="o">=</span><span class="n">popsize</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
+                                         <span class="n">mutation</span><span class="o">=</span><span class="n">mutation</span><span class="p">,</span>
+                                         <span class="n">recombination</span><span class="o">=</span><span class="n">recombination</span><span class="p">,</span>
+                                         <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">polish</span><span class="o">=</span><span class="n">polish</span><span class="p">,</span>
+                                         <span class="n">earlystop</span><span class="o">=</span><span class="n">earlystop</span><span class="p">,</span>
+                                         <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span><span class="p">,</span>
+                                         <span class="n">disp</span><span class="o">=</span><span class="n">disp</span><span class="p">,</span>
+                                         <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span></div>
+
+<span class="k">class</span> <span class="nc">DifferentialEvolutionSolver</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="c1"># Dispatch of mutation strategy method (binomial or exponential).</span>
+    <span class="n">_binomial</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;best1bin&#39;</span><span class="p">:</span> <span class="s1">&#39;_best1&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;randtobest1bin&#39;</span><span class="p">:</span> <span class="s1">&#39;_randtobest1&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;best2bin&#39;</span><span class="p">:</span> <span class="s1">&#39;_best2&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;rand2bin&#39;</span><span class="p">:</span> <span class="s1">&#39;_rand2&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;rand1bin&#39;</span><span class="p">:</span> <span class="s1">&#39;_rand1&#39;</span><span class="p">}</span>
+    <span class="n">_exponential</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;best1exp&#39;</span><span class="p">:</span> <span class="s1">&#39;_best1&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;rand1exp&#39;</span><span class="p">:</span> <span class="s1">&#39;_rand1&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;randtobest1exp&#39;</span><span class="p">:</span> <span class="s1">&#39;_randtobest1&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;best2exp&#39;</span><span class="p">:</span> <span class="s1">&#39;_best2&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;rand2exp&#39;</span><span class="p">:</span> <span class="s1">&#39;_rand2&#39;</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="n">bounds</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(),</span> <span class="n">x0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">strategy</span><span class="o">=</span><span class="s1">&#39;best1bin&#39;</span><span class="p">,</span> <span class="n">maxiter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">popsize</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+                 <span class="n">tol</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">mutation</span><span class="o">=</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">recombination</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">callbacks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">earlystop</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">disp</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">polish</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">init</span><span class="o">=</span><span class="s1">&#39;latinhypercube&#39;</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_binomial</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mutation_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_binomial</span><span class="p">[</span><span class="n">strategy</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exponential</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mutation_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exponential</span><span class="p">[</span><span class="n">strategy</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Please select a valid mutation strategy&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="o">=</span> <span class="n">strategy</span>
+
+        <span class="k">if</span> <span class="n">callbacks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">callable</span><span class="p">(</span><span class="n">callbacks</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">callbacks</span> <span class="o">=</span> <span class="p">(</span><span class="n">callbacks</span><span class="p">,)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">callbacks</span> <span class="o">=</span> <span class="n">callbacks</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">earlystop</span> <span class="o">=</span> <span class="n">earlystop</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">polish</span> <span class="o">=</span> <span class="n">polish</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tol</span> <span class="o">=</span> <span class="n">tol</span>
+
+        <span class="c1"># Mutation constant should be in [0, 2). If specified as a sequence</span>
+        <span class="c1"># then dithering is performed.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">mutation</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">mutation</span><span class="p">))</span> <span class="ow">or</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mutation</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mutation</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The mutation constant must be a float in &#39;</span>
+                             <span class="s1">&#39;U[0, 2), or specified as a tuple(min, max)&#39;</span>
+                             <span class="s1">&#39; where min &lt; max and min, max are in U[0, 2).&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dither</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">mutation</span><span class="p">,</span> <span class="s1">&#39;__iter__&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">mutation</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dither</span> <span class="o">=</span> <span class="p">[</span><span class="n">mutation</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">mutation</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dither</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cross_over_probability</span> <span class="o">=</span> <span class="n">recombination</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">func</span> <span class="o">=</span> <span class="n">func</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="n">args</span>
+
+        <span class="c1"># convert tuple of lower and upper bounds to limits</span>
+        <span class="c1"># [(low_0, high_0), ..., (low_n, high_n]</span>
+        <span class="c1">#     -&gt; [[low_0, ..., low_n], [high_0, ..., high_n]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">bounds</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">))):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;bounds should be a sequence containing &#39;</span>
+                             <span class="s1">&#39;real valued (min, max) pairs for each value&#39;</span>
+                             <span class="s1">&#39; in x&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">maxiter</span> <span class="o">=</span> <span class="n">maxiter</span> <span class="ow">or</span> <span class="mi">1000</span>
+
+        <span class="c1"># population is scaled to between [0, 1].</span>
+        <span class="c1"># We have to scale between parameter &lt;-&gt; population</span>
+        <span class="c1"># save these arguments for _scale_parameter and</span>
+        <span class="c1"># _unscale_parameter. This is an optimization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg1</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fabs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span> <span class="o">=</span> <span class="n">_make_random_gen</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="c1"># default population initialization is a latin hypercube design, but</span>
+        <span class="c1"># there are other population initializations possible.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span> <span class="o">=</span> <span class="n">popsize</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">population_shape</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">,</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">init</span> <span class="o">==</span> <span class="s1">&#39;latinhypercube&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_population_lhs</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">init</span> <span class="o">==</span> <span class="s1">&#39;random&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_population_random</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The population initialization method must be one&quot;</span>
+                             <span class="s2">&quot;of &#39;latinhypercube&#39; or &#39;random&#39;&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">)</span>
+                                    <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">disp</span> <span class="o">=</span> <span class="n">disp</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_pycuda_arrays</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">x0</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">p0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unscale_parameters</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">][:]</span> <span class="o">=</span> <span class="n">x0</span>
+
+
+    <span class="k">def</span> <span class="nf">init_population_lhs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the population with Latin Hypercube Sampling.</span>
+<span class="sd">        Latin Hypercube Sampling ensures that each parameter is uniformly</span>
+<span class="sd">        sampled over its range.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span>
+
+        <span class="c1"># Each parameter range needs to be sampled uniformly. The scaled</span>
+        <span class="c1"># parameter range ([0, 1)) needs to be split into</span>
+        <span class="c1"># `self.num_population_members` segments, each of which has the following</span>
+        <span class="c1"># size:</span>
+        <span class="n">segsize</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span>
+
+        <span class="c1"># Within each segment we sample from a uniform random distribution.</span>
+        <span class="c1"># We need to do this sampling for each parameter.</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="p">(</span><span class="n">segsize</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">random_sample</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_shape</span><span class="p">)</span>
+
+        <span class="c1"># Offset each segment to cover the entire parameter range [0, 1)</span>
+                   <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">,</span>
+                                 <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">])</span>
+
+        <span class="c1"># Create an array for population of candidate solutions.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">population</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+
+        <span class="c1"># Initialize population of candidate solutions by permutation of the</span>
+        <span class="c1"># random samples.</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span><span class="p">):</span>
+            <span class="n">order</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[</span><span class="n">order</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">init_population_random</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialises the population at random.  This type of initialization</span>
+<span class="sd">        can possess clustering, Latin Hypercube sampling is generally better.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">population</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">random_sample</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_shape</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">init_pycuda_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="o">.</span><span class="n">dtype</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gpu_arrays</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span><span class="p">):</span>
+            <span class="n">array</span> <span class="o">=</span> <span class="n">garray</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">gpu_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The best solution from the solver</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        x - ndarray</span>
+<span class="sd">            The best solution from the solver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scale_parameters</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">evaluate_func</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_arrays</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">T</span><span class="p">)):</span>
+            <span class="n">gdrv</span><span class="o">.</span><span class="n">memcpy_htod</span><span class="p">(</span><span class="n">dest</span><span class="o">.</span><span class="n">gpudata</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gpu_arrays</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Runs the DifferentialEvolutionSolver.</span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        res : OptimizeResult</span>
+<span class="sd">            The optimization result represented as a ``OptimizeResult`` object.</span>
+<span class="sd">            Important attributes are: ``x`` the solution array, ``success`` a</span>
+<span class="sd">            Boolean flag indicating if the optimizer exited successfully and</span>
+<span class="sd">            ``message`` which describes the cause of the termination. See</span>
+<span class="sd">            `OptimizeResult` for a description of other attributes.  If `polish`</span>
+<span class="sd">            was employed, and a lower minimum was obtained by the polishing,</span>
+<span class="sd">            then OptimizeResult also contains the ``jac`` attribute.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">nfev</span><span class="p">,</span> <span class="n">nit</span><span class="p">,</span> <span class="n">warning_flag</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">False</span>
+        <span class="n">status_message</span> <span class="o">=</span> <span class="n">_status_message</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]</span>
+
+        <span class="c1"># calculate energies to start with</span>
+        <span class="n">parameters</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">):</span>
+            <span class="n">parameters</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scale_parameters</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluate_func</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+        <span class="n">nfev</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span>
+
+        <span class="c1"># put the lowest energy into the best solution position.</span>
+        <span class="n">minval</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_swap_best</span><span class="p">(</span><span class="n">minval</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">warning_flag</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">OptimizeResult</span><span class="p">(</span>
+                           <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+                           <span class="n">fun</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                           <span class="n">nfev</span><span class="o">=</span><span class="n">nfev</span><span class="p">,</span>
+                           <span class="n">nit</span><span class="o">=</span><span class="n">nit</span><span class="p">,</span>
+                           <span class="n">message</span><span class="o">=</span><span class="n">status_message</span><span class="p">,</span>
+                           <span class="n">success</span><span class="o">=</span><span class="p">(</span><span class="n">warning_flag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">True</span><span class="p">))</span>
+
+        <span class="c1"># do the optimisation.</span>
+        <span class="n">trials</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">nit</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">maxiter</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dither</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span>
+                <span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dither</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">dither</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">dither</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># Unlike the standard DE, all the trials are created first and later</span>
+            <span class="c1"># evaluated simultaneously.</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">):</span>
+                <span class="c1"># create a trial solution</span>
+                <span class="n">trials</span><span class="p">[</span><span class="n">index</span><span class="p">][:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mutate</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+
+                <span class="c1"># ensuring that it&#39;s in the range [0, 1)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_constraint</span><span class="p">(</span><span class="n">trials</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+
+                <span class="c1"># scale from [0, 1) to the actual parameter value</span>
+                <span class="n">parameters</span><span class="p">[</span><span class="n">index</span><span class="p">][:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scale_parameters</span><span class="p">(</span><span class="n">trials</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+
+            <span class="c1"># determine the energy of the objective function</span>
+            <span class="n">energies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluate_func</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+            <span class="n">nfev</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span>
+
+            <span class="c1"># if the energy of the trial candidate is lower than the</span>
+            <span class="c1"># original population member then replace it</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">energies</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="n">index</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">trials</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">energies</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+            <span class="c1"># if the trial candidate also has a lower energy than the</span>
+            <span class="c1"># best solution then replace that as well</span>
+            <span class="n">minval</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_swap_best</span><span class="p">(</span><span class="n">minval</span><span class="p">)</span>
+
+            <span class="c1"># stop when the fractional s.d. of the population is less than tol</span>
+            <span class="c1"># of the mean energy</span>
+            <span class="n">convergence</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">)</span> <span class="o">/</span>
+                           <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">)</span> <span class="o">+</span>
+                                  <span class="n">_MACHEPS</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">disp</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;differential_evolution step </span><span class="si">%d</span><span class="s2">: f(x)= </span><span class="si">%g</span><span class="s2">&quot;</span>
+                      <span class="o">%</span> <span class="p">(</span><span class="n">nit</span><span class="p">,</span>
+                         <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">callbacks</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">callbacks</span><span class="p">:</span>
+                    <span class="n">callback</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">nit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+                             <span class="n">cost</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">earlystop</span> <span class="ow">and</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">earlystop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+                                  <span class="n">convergence</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tol</span> <span class="o">/</span> <span class="n">convergence</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">):</span>
+
+                <span class="n">warning_flag</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">status_message</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;earlystop function requested stop early &#39;</span>
+                                  <span class="s1">&#39;by returning True&#39;</span><span class="p">)</span>
+                <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">convergence</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tol</span> <span class="ow">or</span> <span class="n">warning_flag</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">status_message</span> <span class="o">=</span> <span class="n">_status_message</span><span class="p">[</span><span class="s1">&#39;maxiter&#39;</span><span class="p">]</span>
+            <span class="n">warning_flag</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="n">DE_result</span> <span class="o">=</span> <span class="n">OptimizeResult</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+            <span class="n">fun</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">nfev</span><span class="o">=</span><span class="n">nfev</span><span class="p">,</span>
+            <span class="n">nit</span><span class="o">=</span><span class="n">nit</span><span class="p">,</span>
+            <span class="n">message</span><span class="o">=</span><span class="n">status_message</span><span class="p">,</span>
+            <span class="n">success</span><span class="o">=</span><span class="p">(</span><span class="n">warning_flag</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">True</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">polish</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">,</span>
+                              <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">DE_result</span><span class="o">.</span><span class="n">x</span><span class="p">),</span>
+                              <span class="n">method</span><span class="o">=</span><span class="s1">&#39;L-BFGS-B&#39;</span><span class="p">,</span>
+                              <span class="n">bounds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">limits</span><span class="o">.</span><span class="n">T</span><span class="p">,</span>
+                              <span class="n">args</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+
+            <span class="n">nfev</span> <span class="o">+=</span> <span class="n">result</span><span class="o">.</span><span class="n">nfev</span>
+            <span class="n">DE_result</span><span class="o">.</span><span class="n">nfev</span> <span class="o">=</span> <span class="n">nfev</span>
+
+            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">fun</span> <span class="o">&lt;</span> <span class="n">DE_result</span><span class="o">.</span><span class="n">fun</span><span class="p">:</span>
+                <span class="n">DE_result</span><span class="o">.</span><span class="n">fun</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">fun</span>
+                <span class="n">DE_result</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span>
+                <span class="n">DE_result</span><span class="o">.</span><span class="n">jac</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">jac</span>
+                <span class="c1"># to keep internal state consistent</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">fun</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unscale_parameters</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">DE_result</span>
+
+    <span class="k">def</span> <span class="nf">_scale_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trial</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        scale from a number between 0 and 1 to parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg1</span> <span class="o">+</span> <span class="p">(</span><span class="n">trial</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg2</span>
+
+    <span class="k">def</span> <span class="nf">_unscale_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        scale from parameters to a number between 0 and 1.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">parameters</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg1</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">__scale_arg2</span> <span class="o">+</span> <span class="mf">0.5</span>
+
+    <span class="k">def</span> <span class="nf">_ensure_constraint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trial</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        make sure the parameters lie between the limits</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">trial</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">param</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">param</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">trial</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span><span class="o">.</span><span class="n">rand</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_mutate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">candidate</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create a trial vector based on a mutation strategy</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">trial</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">candidate</span><span class="p">])</span>
+
+        <span class="n">rng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span>
+
+        <span class="n">fill_point</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s1">&#39;randtobest1exp&#39;</span>
+                <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s1">&#39;randtobest1bin&#39;</span><span class="p">):</span>
+            <span class="n">bprime</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mutation_func</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">_select_samples</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">bprime</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mutation_func</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_select_samples</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_binomial</span><span class="p">:</span>
+            <span class="n">crossovers</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span><span class="p">)</span>
+            <span class="n">crossovers</span> <span class="o">=</span> <span class="n">crossovers</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_over_probability</span>
+            <span class="c1"># the last one is always from the bprime vector for binomial</span>
+            <span class="c1"># If you fill in modulo with a loop you have to set the last one to</span>
+            <span class="c1"># true. If you don&#39;t use a loop then you can have any random entry</span>
+            <span class="c1"># be True.</span>
+            <span class="n">crossovers</span><span class="p">[</span><span class="n">fill_point</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">trial</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">crossovers</span><span class="p">,</span> <span class="n">bprime</span><span class="p">,</span> <span class="n">trial</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">trial</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exponential</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">i</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span> <span class="ow">and</span>
+                   <span class="n">rng</span><span class="o">.</span><span class="n">rand</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_over_probability</span><span class="p">):</span>
+
+                <span class="n">trial</span><span class="p">[</span><span class="n">fill_point</span><span class="p">]</span> <span class="o">=</span> <span class="n">bprime</span><span class="p">[</span><span class="n">fill_point</span><span class="p">]</span>
+                <span class="n">fill_point</span> <span class="o">=</span> <span class="p">(</span><span class="n">fill_point</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_count</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">return</span> <span class="n">trial</span>
+
+    <span class="k">def</span> <span class="nf">_best1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        best1bin, best1exp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r1</span><span class="p">]))</span>
+
+    <span class="k">def</span> <span class="nf">_rand1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        rand1bin, rand1exp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">r2</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r2</span><span class="p">]))</span>
+
+    <span class="k">def</span> <span class="nf">_randtobest1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">candidate</span><span class="p">,</span> <span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        randtobest1bin, randtobest1exp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">bprime</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">candidate</span><span class="p">])</span>
+        <span class="n">bprime</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">bprime</span><span class="p">)</span>
+        <span class="n">bprime</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r0</span><span class="p">]</span> <span class="o">-</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">bprime</span>
+
+    <span class="k">def</span> <span class="nf">_best2</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        best2bin, best2exp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">r3</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="mi">4</span><span class="p">]</span>
+        <span class="n">bprime</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span>
+                  <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r1</span><span class="p">]</span>
+                   <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r2</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r3</span><span class="p">]))</span>
+
+        <span class="k">return</span> <span class="n">bprime</span>
+
+    <span class="k">def</span> <span class="nf">_rand2</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        rand2bin, rand2exp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">r3</span><span class="p">,</span> <span class="n">r4</span> <span class="o">=</span> <span class="n">samples</span>
+        <span class="n">bprime</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r0</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span>
+                  <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r2</span><span class="p">]</span> <span class="o">-</span>
+                   <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r3</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[</span><span class="n">r4</span><span class="p">]))</span>
+
+        <span class="k">return</span> <span class="n">bprime</span>
+
+    <span class="k">def</span> <span class="nf">_select_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">candidate</span><span class="p">,</span> <span class="n">number_samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        obtain random integers from range(self.num_population_members),</span>
+<span class="sd">        without replacement.  You can&#39;t have the original candidate either.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">idxs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_population_members</span><span class="p">))</span>
+        <span class="n">idxs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_number_generator</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">idxs</span><span class="p">)</span>
+        <span class="n">idxs</span> <span class="o">=</span> <span class="n">idxs</span><span class="p">[:</span><span class="n">number_samples</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">idxs</span>
+
+    <span class="k">def</span> <span class="nf">_swap_best</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        put the i-th solution into the best solution position.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">population_energies</span><span class="p">[[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">population</span><span class="p">[[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">:]</span>
+
+
+<span class="k">def</span> <span class="nf">_make_random_gen</span><span class="p">(</span><span class="n">seed</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Turn seed into a np.random.RandomState instance</span>
+<span class="sd">    If seed is None, return the RandomState singleton used by np.random.</span>
+<span class="sd">    If seed is an int, return a new RandomState instance seeded with seed.</span>
+<span class="sd">    If seed is already a RandomState instance, return it.</span>
+<span class="sd">    Otherwise raise ValueError.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">seed</span> <span class="ow">is</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">mtrand</span><span class="o">.</span><span class="n">_rand</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="p">(</span><span class="n">numbers</span><span class="o">.</span><span class="n">Integral</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">seed</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%r</span><span class="s1"> cannot be used to seed a numpy.random.RandomState&#39;</span>
+                     <span class="s1">&#39; instance&#39;</span> <span class="o">%</span> <span class="n">seed</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Chung-Heng Yeh
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

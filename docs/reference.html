@@ -85,7 +85,8 @@
             
             
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Reference</a><ul class="simple">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-pycude">Differential Evolution</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
@@ -154,6 +155,112 @@
   <div class="section" id="reference">
 <h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
 <div class="toctree-wrapper compound">
+</div>
+<div class="section" id="module-pycude">
+<span id="differential-evolution"></span><h2>Differential Evolution<a class="headerlink" href="#module-pycude" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="pycude.differential_evolution">
+<code class="descclassname">pycude.</code><code class="descname">differential_evolution</code><span class="sig-paren">(</span><em>func</em>, <em>bounds</em>, <em>x0=None</em>, <em>args=()</em>, <em>strategy='best1bin'</em>, <em>maxiter=None</em>, <em>popsize=15</em>, <em>tol=0.01</em>, <em>mutation=(0.5</em>, <em>1)</em>, <em>recombination=0.7</em>, <em>seed=None</em>, <em>callbacks=None</em>, <em>earlystop=None</em>, <em>disp=False</em>, <em>polish=False</em>, <em>init='latinhypercube'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pycude/_differentialevolution.html#differential_evolution"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pycude.differential_evolution" title="Permalink to this definition">¶</a></dt>
+<dd><p>Finds the global minimum of a multivariate function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> (<em>callable</em>) – The wrapper for parallel invocation of the objective function to be
+minimized.  Must be in the form <code class="docutils literal notranslate"><span class="pre">F(X,</span> <span class="pre">*args)</span></code>, where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the
+argument in the form of a tuple of PyCUDA arrays and <code class="docutils literal notranslate"><span class="pre">args</span></code> is a
+tuple of any additional fixed parameters needed to completely specify
+the function. The objective function must be in the form <code class="docutils literal notranslate"><span class="pre">f(x,</span> <span class="pre">*arg)</span></code>,
+where <code class="docutils literal notranslate"><span class="pre">x</span></code> is the argument taken from the i-th element from each
+arrays in <code class="docutils literal notranslate"><span class="pre">X</span></code>, i.e. <code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">=</span> <span class="pre">(X[0][i],</span> <span class="pre">...,</span> <span class="pre">X[N][i])</span></code>.</li>
+<li><strong>bounds</strong> (<em>sequence</em>) – Bounds for variables.  <code class="docutils literal notranslate"><span class="pre">(min,</span> <span class="pre">max)</span></code> pairs for each element in <code class="docutils literal notranslate"><span class="pre">x</span></code>,
+defining the lower and upper bounds for the optimizing argument of
+<cite>func</cite>. It is required to have <code class="docutils literal notranslate"><span class="pre">len(bounds)</span> <span class="pre">==</span> <span class="pre">len(x)</span></code>.
+<code class="docutils literal notranslate"><span class="pre">len(bounds)</span></code> is used to determine the number of parameters in <code class="docutils literal notranslate"><span class="pre">x</span></code>.</li>
+<li><strong>x0</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Initial value for <code class="docutils literal notranslate"><span class="pre">x</span></code>. If <code class="docutils literal notranslate"><span class="pre">x0</span></code> is given, it will be placed at the
+first element of the population.</li>
+<li><strong>args</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Any additional fixed parameters needed to
+completely specify the objective function.</li>
+<li><strong>strategy</strong> (<em>str</em><em>, </em><em>optional</em>) – <dl class="docutils">
+<dt>The differential evolution strategy to use. Should be one of:</dt>
+<dd><ul class="first last">
+<li>’best1bin’</li>
+<li>’best1exp’</li>
+<li>’rand1exp’</li>
+<li>’randtobest1exp’</li>
+<li>’best2exp’</li>
+<li>’rand2exp’</li>
+<li>’randtobest1bin’</li>
+<li>’best2bin’</li>
+<li>’rand2bin’</li>
+<li>’rand1bin’</li>
+</ul>
+</dd>
+</dl>
+<p>The default is ‘best1bin’</p>
+</li>
+<li><strong>maxiter</strong> (<em>int</em><em>, </em><em>optional</em>) – The maximum number of generations over which the entire population is
+evolved. The maximum number of function evaluations (with no polishing)
+is: <code class="docutils literal notranslate"><span class="pre">(maxiter</span> <span class="pre">+</span> <span class="pre">1)</span> <span class="pre">*</span> <span class="pre">popsize</span> <span class="pre">*</span> <span class="pre">len(x)</span></code></li>
+<li><strong>popsize</strong> (<em>int</em><em>, </em><em>optional</em>) – A multiplier for setting the total population size.  The population has
+<code class="docutils literal notranslate"><span class="pre">popsize</span> <span class="pre">*</span> <span class="pre">len(x)</span></code> individuals.</li>
+<li><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) – When the mean of the population energies, multiplied by tol,
+divided by the standard deviation of the population energies
+is greater than 1 the solving process terminates:
+<code class="docutils literal notranslate"><span class="pre">convergence</span> <span class="pre">=</span> <span class="pre">mean(pop)</span> <span class="pre">*</span> <span class="pre">tol</span> <span class="pre">/</span> <span class="pre">stdev(pop)</span> <span class="pre">&gt;</span> <span class="pre">1</span></code></li>
+<li><strong>mutation</strong> (<em>float</em><em> or </em><em>tuple</em><em>(</em><em>float</em><em>, </em><em>float</em><em>)</em><em>, </em><em>optional</em>) – The mutation constant. In the literature this is also known as
+differential weight, being denoted by F.
+If specified as a float it should be in the range [0, 2].
+If specified as a tuple <code class="docutils literal notranslate"><span class="pre">(min,</span> <span class="pre">max)</span></code> dithering is employed. Dithering
+randomly changes the mutation constant on a generation by generation
+basis. The mutation constant for that generation is taken from
+U[min, max). Dithering can help speed convergence significantly.
+Increasing the mutation constant increases the search radius, but will
+slow down convergence.</li>
+<li><strong>recombination</strong> (<em>float</em><em>, </em><em>optional</em>) – The recombination constant, should be in the range [0, 1]. In the
+literature this is also known as the crossover probability, being
+denoted by CR. Increasing this value allows a larger number of mutants
+to progress into the next generation, but at the risk of population
+stability.</li>
+<li><strong>seed</strong> (int or <cite>np.random.RandomState</cite>, optional) – If <cite>seed</cite> is not specified the <cite>np.random.RandomState</cite> singleton is
+used.
+If <cite>seed</cite> is an int, a new <cite>np.random.RandomState</cite> instance is used,
+seeded with <cite>seed</cite>.
+If <cite>seed</cite> is already a <cite>np.random.RandomState</cite> instance, then that
+<cite>np.random.RandomState</cite> instance is used.
+Specify <cite>seed</cite> for repeatable minimizations.</li>
+<li><strong>disp</strong> (<em>bool</em><em>, </em><em>optional</em>) – Display status messages</li>
+<li><strong>earlystop</strong> (callable, <cite>earlystop(xk, convergence=val)</cite>, optional) – A function to follow the progress of the minimization. <code class="docutils literal notranslate"><span class="pre">xk</span></code> is
+the current value of <code class="docutils literal notranslate"><span class="pre">x0</span></code>. <code class="docutils literal notranslate"><span class="pre">val</span></code> represents the fractional
+value of the population convergence.  When <code class="docutils literal notranslate"><span class="pre">val</span></code> is greater than one
+the function halts. If <cite>earlystop</cite> returns <cite>True</cite>, then the minimization
+is halted (any polishing is still carried out).</li>
+<li><strong>callbacks</strong> (<em>a callable</em><em> or </em><em>a list of callables</em><em>, </em><em>optional</em>) – A list of functions to be called at the end of each iteration. A
+callback will be called with <cite>callback(step=i, parameter=p, cost=c)</cite>,
+where <code class="docutils literal notranslate"><span class="pre">step</span></code> is the step of iteration, <code class="docutils literal notranslate"><span class="pre">parameter</span></code> is the best
+solution with the lowest <code class="docutils literal notranslate"><span class="pre">cost</span></code>. Note adding keyword arguments to the
+signature of a callback will avoid ‘unexpected argument’ error, i.e
+<code class="docutils literal notranslate"><span class="pre">callback(...,</span> <span class="pre">**kwargs)</span></code>.</li>
+<li><strong>polish</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, then <cite>scipy.optimize.minimize</cite> with the <cite>L-BFGS-B</cite> method
+is used to polish the best population member at the end. This requires
+a few more function evaluations.</li>
+<li><strong>init</strong> (<em>string</em><em>, </em><em>optional</em>) – <p>Specify which type of population initialization is performed. Should be
+one of:</p>
+<blockquote>
+<div><ul>
+<li>’latinhypercube’</li>
+<li>’random’</li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 </div>
 

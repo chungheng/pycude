@@ -154,13 +154,38 @@
 <a class="reference external" href="https://en.wikipedia.org/wiki/Differential_evolution">Differential Evolution</a>
 algorithm. The parallelization assumes that the objective function
 can be evaluated in parallel with parameters presented in PyCUDA arrays.</p>
+<p>This package is largely based on <cite>scipy</cite>’s implementation of
+<a class="reference external" href="https://github.com/scipy/scipy/blob/master/scipy/optimize/_differentialevolution.py">DE</a>
+algorithm. The algorithm is invented by <a class="reference external" href="https://doi.org/10.1023/A:1008202821328">Storn and Price</a>.</p>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>Clone and navigate into the repository, and then execute the command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>This package depends on <cite>scipy</cite> and <cite>numpy</cite>.</p>
+</div>
+<div class="section" id="example">
+<h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pycude</span> <span class="kn">import</span> <span class="n">differential_evolution</span>
+
+<span class="c1"># a function with input arguments in pycuda.gpuarray</span>
+<span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="n">bounds</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">differential_evolution</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+</pre></div>
+</div>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference</a><ul class="simple">
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference.html#module-pycude">Differential Evolution</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
 </ul>
+</div>
 </div>
 <div class="section" id="index">
 <h2>Index<a class="headerlink" href="#index" title="Permalink to this headline">¶</a></h2>
