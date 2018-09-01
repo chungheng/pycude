@@ -20,7 +20,7 @@ __all__ = ['differential_evolution']
 _MACHEPS = np.finfo(np.float64).eps
 
 def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
-                           maxiter=None, popsize=15, tol=0.01,
+                           maxiter=None, popsize=0, popscale=15, tol=0.01,
                            mutation=(0.5, 1), recombination=0.7, seed=None,
                            callbacks=None, earlystop=None, disp=False, polish=False, init='latinhypercube'):
     """Finds the global minimum of a multivariate function.
@@ -63,15 +63,17 @@ def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
     maxiter : int, optional
         The maximum number of generations over which the entire population is
         evolved. The maximum number of function evaluations (with no polishing)
-        is: ``(maxiter + 1) * popsize * len(x)``
+        is: ``(maxiter + 1) * popsize``.
     popsize : int, optional
+        Population size. If zero, the population size is set with ``popscale``.
+    popscale : int, optional
         A multiplier for setting the total population size.  The population has
-        ``popsize * len(x)`` individuals.
+        ``popsize = popscale * len(x)`` individuals.
     tol : float, optional
         When the mean of the population energies, multiplied by tol,
         divided by the standard deviation of the population energies
         is greater than 1 the solving process terminates:
-        ``convergence = mean(pop) * tol / stdev(pop) > 1``
+        ``convergence = mean(pop) * tol / stdev(pop) > 1``.
     mutation : float or tuple(float, float), optional
         The mutation constant. In the literature this is also known as
         differential weight, being denoted by F.
@@ -123,8 +125,7 @@ def differential_evolution(func, bounds, x0=None, args=(), strategy='best1bin',
     """
     solver = DifferentialEvolutionSolver(func, bounds, args=args, x0=None,
                                          strategy=strategy, maxiter=maxiter,
-                                         popsize=popsize, tol=tol,
-                                         mutation=mutation,
+                                         popsize=popsize, popscale=popscale, tol=tol, mutation=mutation,
                                          recombination=recombination,
                                          seed=seed, polish=polish,
                                          earlystop=earlystop,
@@ -148,7 +149,7 @@ class DifferentialEvolutionSolver(object):
                     'rand2exp': '_rand2'}
 
     def __init__(self, func, bounds, args=(), x0=None,
-                 strategy='best1bin', maxiter=None, popsize=15,
+                 strategy='best1bin', maxiter=None, popsize=0, popscale=15,
                  tol=0.01, mutation=(0.5, 1), recombination=0.7, seed=None,
                  callbacks=None, earlystop=None, disp=False, polish=False,
                  init='latinhypercube'):
@@ -214,7 +215,7 @@ class DifferentialEvolutionSolver(object):
 
         # default population initialization is a latin hypercube design, but
         # there are other population initializations possible.
-        self.num_population_members = popsize * self.parameter_count
+        self.num_population_members = popsize or popscale * self.parameter_count
 
         self.population_shape = (self.num_population_members,
                                  self.parameter_count)
